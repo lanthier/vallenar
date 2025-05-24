@@ -5,7 +5,7 @@
   "description": "",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "empacalo src/demo/main.ts dist/demo/main.js",
     "start": "npm run build && live-server"
   },
   "keywords": [],
