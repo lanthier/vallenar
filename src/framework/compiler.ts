@@ -1,20 +1,32 @@
 import { effect } from './reactive';
+import { Parser } from 'expr-eval';
 
-/**
- * Evaluate an expression string in the context of a given state object.
- * WARNING: Uses `new Function` + `with`, which is insecure and slow.
- * For the initial project only—replace with a proper parser in production.
- */
-function evalIn(state: any, exp: string) {
-  // Create a function whose body is: with(state) { return <expression> }
-  // Then immediately invoke it with the `state` object bound.
-  return new Function('state', `with(state){ return ${exp} }`)(state);
+const parser = new Parser();
+const exprCache = new Map<string, ReturnType<Parser['parse']>>();
+
+function evalIn(state: any, exp: string): any {
+  const userFns = state.methods ?? {};
+
+  let expr = exprCache.get(exp);
+  if (!expr) {
+    expr = parser.parse(exp);
+    exprCache.set(exp, expr);
+  }
+
+  try {
+    return expr.evaluate({
+      ...state,
+      ...userFns
+    });
+  } catch (e) {
+    console.warn(`Failed to evaluate expression "${exp}":`, e);
+    return '';
+  }
 }
-
 /**
  * Walks the DOM tree under `root`, looking for:
  *  1. Text nodes containing {{ ... }} interpolations
- *  2. Elements with `v-text` or `v-model` attributes
+ *  2. Elements with supported attributes
  *
  * For each binding found, registers a reactive `effect` so the DOM updates
  * automatically whenever the corresponding `state` properties change.
@@ -33,9 +45,7 @@ export function bindDirectives(
   let node: Node | null;
   // Iterate through every node in document order
   while ((node = walker.nextNode())) {
-    // ----------------------------------------
-    // 1) Handle {{ interpolation }} in text nodes
-    // ----------------------------------------
+    // #region Interpolation
     if (node.nodeType === Node.TEXT_NODE) {
       const txt = node as Text;
       // Regex to find {{ expression }} patterns
@@ -55,10 +65,9 @@ export function bindDirectives(
         });
       }
     }
+    // #endregion
 
-    // ----------------------------------------
-    // 2) Handle element-level directives
-    // ----------------------------------------
+    // region Element Directives
     if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
 
@@ -91,7 +100,17 @@ export function bindDirectives(
           // Remove the directive attribute for cleanliness
           el.removeAttribute(name);
         }
+
+        // Event handlers
+        if (name.startsWith('v-on:')) {
+          const eventName = name.slice(5);
+          el.addEventListener(eventName, e => {
+            evalIn(state, value);
+          });
+          el.removeAttribute(name);
+        }
       }
     }
+    // #endregion
   }
 }

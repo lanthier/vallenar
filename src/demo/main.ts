@@ -3,7 +3,12 @@ import { Component } from '../framework/component';
 
 class Counter extends Component<{ initial: number }> {
   protected initState() {
-    return { count: this.props.initial };
+    return { 
+      count: this.props.initial, 
+      methods: {
+        greet: () => { alert('hi'); }
+      }
+    };
   }
 
   protected template() {
@@ -11,7 +16,7 @@ class Counter extends Component<{ initial: number }> {
       <div style="font-family:sans-serif; text-align:center; margin-top:2rem;">
         <h2>Count: <span v-text="count"></span></h2>
         <button id="dec">–</button>
-        <button id="inc">+</button>
+        <button id="inc" v-on:click="greet()">+</button>
         <p>
           <label>Set directly:
             <input type="range" min="0" max="100" v-model="count" />
